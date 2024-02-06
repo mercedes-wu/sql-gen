@@ -8,9 +8,9 @@ def initialize_model_and_tokenizer(model_name):
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         trust_remote_code=True,
-        # torch_dtype=torch.float16,
+        torch_dtype=torch.float16,
         # load_in_8bit=True,
-        load_in_4bit=True,
+        # load_in_4bit=True,
         device_map="auto",
         use_cache=True,
     )
@@ -61,8 +61,8 @@ def empty_cuda_cache():
 def main(): 
     print(f'CUDA availability: {torch.cuda.is_available()}')
 
-    model_name = "codellama/CodeLlama-34b-hf"
-    question = "What is our total revenue by product in the last week?"
+    model_name = "codellama/CodeLlama-7b-hf"
+    question = "What is our total revenue by product grouped by the week? Keep the date field in the select portion"
     schema = """
         CREATE TABLE products (
         product_id INTEGER PRIMARY KEY, -- Unique ID for each product
@@ -110,6 +110,8 @@ def main():
     sql_output = generate_sql(model, tokenizer, prompt)
     formatted_sql = sqlparse.format(sql_output[0].split("```sql")[-1], reindent=True)
     print(formatted_sql)
+
+    empty_cuda_cache()
 
     return formatted_sql
 
