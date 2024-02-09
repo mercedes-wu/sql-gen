@@ -5,15 +5,26 @@ import sqlparse
 
 def initialize_model_and_tokenizer(model_name):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        trust_remote_code=True,
-        torch_dtype=torch.float16,
-        # load_in_8bit=True,
-        # load_in_4bit=True,
-        device_map="auto",
-        use_cache=True,
-    )
+    available_memory = torch.cuda.get_device_properties(0).total_memory
+    if available_memory > 15e9:
+        # if you have atleast 15GB of GPU memory, run load the model in float16
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            trust_remote_code=True,
+            torch_dtype=torch.float16,
+            device_map="auto",
+            use_cache=True,
+        )
+    else:
+        # else, load in 8 bits – this is a bit slower
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            trust_remote_code=True,
+            # torch_dtype=torch.float16,
+            load_in_8bit=True,
+            device_map="auto",
+            use_cache=True,
+        )
 
     return model, tokenizer
 
@@ -61,7 +72,7 @@ def empty_cuda_cache():
 def main(): 
     print(f'CUDA availability: {torch.cuda.is_available()}')
 
-    model_name = "codellama/CodeLlama-7b-hf"
+    model_name = "defog/sqlcoder-7b-2"
     question = "What is our total revenue by product grouped by the week? Keep the date field in the select portion"
     schema = """
         CREATE TABLE products (

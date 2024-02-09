@@ -2,3 +2,4 @@ transformers
 sqlparse
 accelerate
 bitsandbytes
+duckdb

@@ -26,7 +26,7 @@
 				"ms-python.pylint",
 				"ms-python.autopep8",
 				"ms-python.black-formatter",
-				"ms-python.flake8"
+				"ms-python.flake8",
 			]
 		}
 	},
