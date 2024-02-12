@@ -3,3 +3,5 @@ sqlparse
 accelerate
 bitsandbytes
 dbt-postgres
+psycopg2-binary
+pandas
