@@ -5,11 +5,11 @@ version: '0.1'
 
 profile: 'jaffle_shop'
 
-model-paths: ["models"]
-seed-paths: ["seeds"]
-test-paths: ["tests"]
-analysis-paths: ["analysis"]
-macro-paths: ["macros"]
+model-paths: ["jaffle_shop/models"]
+seed-paths: ["jaffle_shop/seeds"]
+test-paths: ["jaffle_shop/tests"]
+analysis-paths: ["jaffle_shop/analysis"]
+macro-paths: ["jaffle_shop/macros"]
 
 target-path: "target"
 clean-targets:
