@@ -2,4 +2,4 @@ transformers
 sqlparse
 accelerate
 bitsandbytes
-duckdb
+dbt-postgres
