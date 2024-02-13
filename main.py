@@ -29,7 +29,7 @@ def initialize_model_and_tokenizer(model_name):
     return model, tokenizer
 
 
-def create_prompt(question, schema):
+def create_prompt(question, schema, description):
     prompt = f"""### Task
         Generate a SQL query to answer the following question:
         `{question}`
@@ -37,6 +37,10 @@ def create_prompt(question, schema):
         ### Database Schema
         This query will run on a database whose schema is represented in this string:
         {schema}
+
+        ### Database Description
+        The description of the schema is represented in this string:
+        {description}
 
         ### SQL
         Given the database schema, here is the SQL query that answers `{question}`:
@@ -73,50 +77,49 @@ def main():
     print(f'CUDA availability: {torch.cuda.is_available()}')
 
     model_name = "defog/sqlcoder-7b-2"
-    question = "What is our total revenue by product grouped by the week? Keep the date field in the select portion"
+    question = """
+        What is the sum of orders for first name Michael, last name P.? Use the analytics schema.
+        Adhere to these rules:
+        - **Deliberately go through the question and database schema word by word** to appropriately answer the question
+        - **Use Table Aliases** to prevent ambiguity. For example, `SELECT table1.col1, table2.col1 FROM table1 JOIN table2 ON table1.id = table2.id`.
+        - When creating a ratio, always cast the numerator as float
+    """
     schema = """
-        CREATE TABLE products (
-        product_id INTEGER PRIMARY KEY, -- Unique ID for each product
-        name VARCHAR(50), -- Name of the product
-        price DECIMAL(10,2), -- Price of each unit of the product
-        quantity INTEGER  -- Current quantity in stock
-        );
-
-        CREATE TABLE customers (
-        customer_id INTEGER PRIMARY KEY, -- Unique ID for each customer
-        name VARCHAR(50), -- Name of the customer
-        address VARCHAR(100) -- Mailing address of the customer
-        );
-
-        CREATE TABLE salespeople (
-        salesperson_id INTEGER PRIMARY KEY, -- Unique ID for each salesperson
-        name VARCHAR(50), -- Name of the salesperson
-        region VARCHAR(50) -- Geographic sales region
-        );
-
-        CREATE TABLE sales (
-        sale_id INTEGER PRIMARY KEY, -- Unique ID for each sale
-        product_id INTEGER, -- ID of product sold
-        customer_id INTEGER,  -- ID of customer who made purchase
-        salesperson_id INTEGER, -- ID of salesperson who made the sale
-        sale_date DATE, -- Date the sale occurred
-        quantity INTEGER -- Quantity of product sold
-        );
-
-        CREATE TABLE product_suppliers (
-        supplier_id INTEGER PRIMARY KEY, -- Unique ID for each supplier
-        product_id INTEGER, -- Product ID supplied
-        supply_price DECIMAL(10,2) -- Unit price charged by supplier
-        );
-
-        -- sales.product_id can be joined with products.product_id
-        -- sales.customer_id can be joined with customers.customer_id
-        -- sales.salesperson_id can be joined with salespeople.salesperson_id
-        -- product_suppliers.product_id can be joined with products.product_id
+        CREATE TABLE analytics.customers (
+        first_order date,
+        number_of_orders bigint,
+        customer_lifetime_value bigint,
+        customer_id integer,
+        most_recent_order date,
+        first_name text,
+        last_name text
+    )
+    """
+    table_description = """
+    name: customers
+    description: This table has basic information about a customer, as well as some derived facts based on a customer's orders
+    columns:
+      - name: customer_id
+        description: This is a unique identifier for a customer
+        tests:
+          - unique
+          - not_null
+      - name: first_name
+        description: Customer's first name. PII.
+      - name: last_name
+        description: Customer's last name. PII.
+      - name: first_order
+        description: Date (UTC) of a customer's first order
+      - name: most_recent_order
+        description: Date (UTC) of a customer's most recent order
+      - name: number_of_orders
+        description: Count of the number of orders a customer has placed
+      - name: total_order_amount
+        description: Total value (AUD) of a customer's orders
     """
     
     model, tokenizer = initialize_model_and_tokenizer(model_name)
-    prompt = create_prompt(question, schema)
+    prompt = create_prompt(question, schema, table_description)
 
     sql_output = generate_sql(model, tokenizer, prompt)
     formatted_sql = sqlparse.format(sql_output[0].split("```sql")[-1], reindent=True)
@@ -128,5 +131,4 @@ def main():
 
 
 if __name__ == '__main__':
-
     main()

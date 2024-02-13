@@ -4,4 +4,5 @@ accelerate
 bitsandbytes
 dbt-postgres
 psycopg2-binary
+ddlgenerator
 pandas
