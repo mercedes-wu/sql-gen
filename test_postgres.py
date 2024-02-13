@@ -24,23 +24,30 @@ def generate_table_ddl(conn, table_name):
 
 try:
     # Connect to your PostgreSQL database
-    conn = psycopg2.connect(database="app",
-                        host="db",
-                        user="app_user",
-                        password="app_password",
-                        port="5432")
+    conn = psycopg2.connect(
+        database="app",
+        host="db",
+        user="app_user",
+        password="app_password",
+        port="5432"
+    )
 
     query = """
-    SELECT SUM(c.number_of_orders) AS total_orders
-    FROM analytics.customers c
-    WHERE c.first_name ILIKE '%Michael%'
-        AND c.last_name ILIKE '%P%';
+    SELECT o.order_id,
+        o.order_date,
+        c.first_name,
+        c.last_name
+    FROM analytics.orders o
+    JOIN analytics.customers c ON o.customer_id = c.customer_id
+    WHERE c.first_name ilike '%Michael%'
+        AND c.last_name ilike '%P%';
     """
+    
     df = pd.read_sql_query(query, conn)
     print(df)
     
     # Generate DDL for a specific table
-    table_name = "customers"
+    table_name = "orders"
     ddl = generate_table_ddl(conn, table_name)
     # print(ddl)
 
