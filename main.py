@@ -1,33 +1,5 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from helper.llm_helper import LLM, Prompt
 import sqlparse
-
-
-def initialize_model_and_tokenizer(model_name):
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    available_memory = torch.cuda.get_device_properties(0).total_memory
-    if available_memory > 15e9:
-        # if you have atleast 15GB of GPU memory, run load the model in float16
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            trust_remote_code=True,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            use_cache=True,
-        )
-    else:
-        # else, load in 8 bits – this is a bit slower
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            trust_remote_code=True,
-            # torch_dtype=torch.float16,
-            load_in_8bit=True,
-            device_map="auto",
-            use_cache=True,
-        )
-
-    return model, tokenizer
-
 
 def create_prompt(question, schema, description):
     prompt = f"""### Task
@@ -49,34 +21,12 @@ def create_prompt(question, schema, description):
 
     return prompt
 
-
-def generate_sql(model, tokenizer, prompt):
-    eos_token_id = tokenizer.eos_token_id
-    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
-    generated_ids = model.generate(
-        **inputs,
-        num_return_sequences=1,
-        eos_token_id=eos_token_id,
-        pad_token_id=eos_token_id,
-        max_new_tokens=400,
-        do_sample=False,
-        num_beams=1,
-    )
-    outputs = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-
-    return outputs
-
-def empty_cuda_cache():
-    # empty cache so that you do generate more results w/o memory crashing
-    # particularly important on Colab – memory management is much more straightforward
-    # when running on an inference service
-    torch.cuda.empty_cache()
-    torch.cuda.synchronize()
-
 def main(): 
-    print(f'CUDA availability: {torch.cuda.is_available()}')
-
     model_name = "defog/sqlcoder-7b-2"
+    sql_llm = LLM(model_name)
+
+    print(f'CUDA availability: {sql_llm.cuda_availability}')
+    
     question = """
         Return all the orders for Michael P.? Use the analytics schema for all tables in the query
         Use the postgres sql syntax.
@@ -133,18 +83,16 @@ def main():
             description: Total value (AUD) of a customer's orders
     """
     
-    model, tokenizer = initialize_model_and_tokenizer(model_name)
-    prompt = create_prompt(question, schema, table_description)
+    prompt = Prompt(question, schema, table_description).create_prompt()
 
-    sql_output = generate_sql(model, tokenizer, prompt)
+    sql_output = sql_llm.generate_sql(prompt)
 
     formatted_sql = sqlparse.format(sql_output[0].split("```sql")[-1], reindent=True)
     print(formatted_sql)
 
-    empty_cuda_cache()
+    sql_llm.empty_cuda_cache()
 
     return formatted_sql
-
 
 if __name__ == '__main__':
     main()
