@@ -3,20 +3,22 @@ import sqlparse
 import pandas as pd
 
 class Connection:
-    def __init__(self, database, host, user, password, port):
+    def __init__(self, database, host, schema, user, password, port):
         self._database = database
         self._host = host
+        self._schema = schema
         self._user = user
         self._password = password
         self._port = port
-
+        
     def create_connection(self):
         conn = psycopg2.connect(
             database = self._database,
             host = self._host,
             user = self._user,
             password = self._password,
-            port = self._port
+            port = self._port,
+            options = f"-c search_path={self._schema}"
         )
         return conn
     

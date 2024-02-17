@@ -29,6 +29,7 @@ def main():
     postgres_conn = Connection(
         "app",
         "db",
+        "analytics",
         "app_user",
         "app_password",
         "5432"
@@ -89,6 +90,7 @@ def main():
     output_df = postgres_conn.query_to_df(formatted_sql)
 
     sql_llm.empty_cuda_cache()
+    print(output_df)
 
     return output_df
 
