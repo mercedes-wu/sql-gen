@@ -1,4 +1,5 @@
 from helper.llm_helper import LLM, Prompt
+from helper.postgres_helper import Connection
 import sqlparse
 
 def create_prompt(question, schema, description):
@@ -25,38 +26,34 @@ def main():
     model_name = "defog/sqlcoder-7b-2"
     sql_llm = LLM(model_name)
 
+    postgres_conn = Connection(
+        "app",
+        "db",
+        "app_user",
+        "app_password",
+        "5432"
+    )
+
+    orders_ddl = postgres_conn.generate_table_ddl('orders')
+    customers_ddl = postgres_conn.generate_table_ddl('customers')
+
     print(f'CUDA availability: {sql_llm.cuda_availability}')
     
     question = """
-        Return all the orders for Michael P.? Use the analytics schema for all tables in the query
+        You are expert database engineer.
+        Return all the orders for Michael P.? 
+        You must prefix table names with "analytics" for all tables in the query
+        
         Use the postgres sql syntax.
         Adhere to these rules:
         - **Deliberately go through the question and database schema word by word** to appropriately answer the question
         - **Use Table Aliases** to prevent ambiguity. For example, `SELECT table1.col1, table2.col1 FROM table1 JOIN table2 ON table1.id = table2.id`.
         - When creating a ratio, always cast the numerator as float
     """
-    schema = """
-        CREATE TABLE analytics.customers (
-            first_order date,
-            number_of_orders bigint,
-            customer_lifetime_value bigint,
-            customer_id integer,
-            most_recent_order date,
-            first_name text,
-            last_name text
-        );
+    schema = f"""
+        {orders_ddl}
 
-        CREATE TABLE analytics.orders (
-            amount bigint,
-            customer_id integer,
-            order_date date,
-            order_id integer,
-            credit_card_amount bigint,
-            coupon_amount bigint,
-            bank_transfer_amount bigint,
-            gift_card_amount bigint,
-            status text
-        );
+        {customers_ddl}
 
         -- customers.customer_id can be joined with orders.customer_id
     """
@@ -85,14 +82,15 @@ def main():
     
     prompt = Prompt(question, schema, table_description).create_prompt()
 
-    sql_output = sql_llm.generate_sql(prompt)
+    output_sql = sql_llm.generate_sql(prompt)
 
-    formatted_sql = sqlparse.format(sql_output[0].split("```sql")[-1], reindent=True)
+    formatted_sql = sqlparse.format(output_sql[0].split("```sql")[-1], reindent=True)
     print(formatted_sql)
+    output_df = postgres_conn.query_to_df(formatted_sql)
 
     sql_llm.empty_cuda_cache()
 
-    return formatted_sql
+    return output_df
 
 if __name__ == '__main__':
     main()
