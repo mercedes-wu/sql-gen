@@ -38,11 +38,10 @@ def main():
     orders_ddl = postgres_conn.generate_table_ddl('orders')
     customers_ddl = postgres_conn.generate_table_ddl('customers')
 
-    print(f'CUDA availability: {sql_llm.cuda_availability}')
-    
     question = """
         You are expert database engineer.
-        Return all the orders for Michael P.? 
+        Who is the customer who made the most orders?
+        Return all of the orders that customer made as individual rows.
         You must prefix table names with "analytics" for all tables in the query
         
         Use the postgres sql syntax.
@@ -79,18 +78,76 @@ def main():
             description: Count of the number of orders a customer has placed
         - name: total_order_amount
             description: Total value (AUD) of a customer's orders
+
+        - name: orders
+        description: This table has basic information about orders, as well as some derived facts based on payments
+        columns:
+        - name: order_id
+            tests:
+            - unique
+            - not_null
+            description: This is a unique identifier for an order
+        - name: customer_id
+            description: Foreign key to the customers table
+            tests:
+            - not_null
+            - relationships:
+                to: ref('customers')
+                field: customer_id
+        - name: order_date
+            description: Date (UTC) that the order was placed
+        - name: status
+            description: '{{ doc("orders_status") }}'
+            tests:
+            - accepted_values:
+                values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
+        - name: amount
+            description: Total amount (AUD) of the order
+            tests:
+            - not_null
+        - name: credit_card_amount
+            description: Amount of the order (AUD) paid for by credit card
+            tests:
+            - not_null
+        - name: coupon_amount
+            description: Amount of the order (AUD) paid for by coupon
+            tests:
+            - not_null
+        - name: bank_transfer_amount
+            description: Amount of the order (AUD) paid for by bank transfer
+            tests:
+            - not_null
+        - name: gift_card_amount
+            description: Amount of the order (AUD) paid for by gift card
+            tests:
+            - not_null
     """
     
     prompt = Prompt(question, schema, table_description).create_prompt()
+    # print(prompt)
 
     output_sql = sql_llm.generate_sql(prompt)
 
     formatted_sql = sqlparse.format(output_sql[0].split("```sql")[-1], reindent=True)
-    print(formatted_sql)
+    # print(formatted_sql)
+
+    sql15b_sql = """
+        WITH customer_order_count AS (
+            SELECT c.customer_id, count(*) AS order_count
+            FROM analytics.customers c join analytics.orders o on c.customer_id = o.customer_id
+            GROUP BY c.customer_id
+        )
+        SELECT *
+        FROM analytics.customers c
+        WHERE c.customer_id IN (select customer_id from customer_order_count order by order_count desc limit 1);
+    """
     output_df = postgres_conn.query_to_df(formatted_sql)
 
+    sql15b_df = postgres_conn.query_to_df(sql15b_sql)
+
     sql_llm.empty_cuda_cache()
-    print(output_df)
+    # print(output_df)
+    print(sql15b_df)
 
     return output_df
 

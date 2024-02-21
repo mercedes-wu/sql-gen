@@ -1,0 +1,12 @@
+test_profile:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: db
+      user: app_user
+      password: app_password
+      port: 5432
+      dbname: app
+      schema: public
+      threads: 1
